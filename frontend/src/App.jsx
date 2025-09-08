@@ -14,6 +14,30 @@ function App() {
   const baseURI =
     "https://ipfs.io/ipfs/QmVcio2y1UP7XdvaBhJkKWQT1bCKXXVeeyTVj1KMB9Mz5W/";
 
+  function toGatewayURL(ipfsUrl) {
+    if (!ipfsUrl) return null;
+    if (ipfsUrl.startsWith("ipfs://")) {
+      const cidPath = ipfsUrl.replace("ipfs://", "");
+      return `https://ipfs.io/ipfs/${cidPath}`;
+    }
+    return ipfsUrl;
+  }
+
+  function withGatewayFallback(url) {
+    if (!url) return [];
+    try {
+      const cidPath = url.includes("/ipfs/") ? url.split("/ipfs/")[1] : null;
+      if (!cidPath) return [url];
+      return [
+        `https://ipfs.io/ipfs/${cidPath}`,
+        `https://cloudflare-ipfs.com/ipfs/${cidPath}`,
+        `https://dweb.link/ipfs/${cidPath}`,
+      ];
+    } catch {
+      return [url];
+    }
+  }
+
   async function ensureSepolia() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const network = await provider.getNetwork();
@@ -138,17 +162,27 @@ function App() {
     }
   }, [account, contract]);
 
-  // Load NFTs
+  // Load NFTs (read metadata -> image with gateway fallback)
   useEffect(() => {
     const loadNFTs = async () => {
-      const nftList = [];
-      for (let i = 1; i <= 16; i++) {
-        nftList.push({
-          name: `NFT #${i}`,
-          image: `${baseURI}${i}.jpg`,
-        });
-      }
-      setNfts(nftList);
+      const items = await Promise.all(
+        Array.from({ length: 16 }, async (_, idx) => {
+          const tokenId = idx + 1;
+          try {
+            const metaUrl = `${baseURI}${tokenId}.json`;
+            const res = await fetch(metaUrl, { cache: "no-store" });
+            if (!res.ok) throw new Error("metadata not found");
+            const meta = await res.json();
+            const primary = toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
+            const candidates = withGatewayFallback(primary);
+            return { name: meta.name || `NFT #${tokenId}` , imageCandidates: candidates };
+          } catch (e) {
+            const fallback = `${baseURI}${tokenId}.jpg`;
+            return { name: `NFT #${tokenId}` , imageCandidates: [fallback] };
+          }
+        })
+      );
+      setNfts(items);
     };
     loadNFTs();
   }, []);
@@ -208,11 +242,26 @@ function App() {
             key={idx}
             className="bg-gray-800 p-4 rounded-xl shadow-md flex flex-col items-center"
           >
-            <img
-              src={nft.image}
-              alt={nft.name}
-              className="rounded-lg w-full h-48 object-cover"
-            />
+            {(() => {
+              const srcList = nft.imageCandidates || [];
+              const first = srcList[0] || "";
+              return (
+                <img
+                  src={first}
+                  alt={nft.name}
+                  className="rounded-lg w-full h-48 object-cover"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    const currentIndex = srcList.indexOf(img.src);
+                    const next = srcList[currentIndex + 1];
+                    if (next) img.src = next;
+                  }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                />
+              );
+            })()}
             <h2 className="text-lg font-semibold mt-2">{nft.name}</h2>
             <button
               onClick={mintNFT}
