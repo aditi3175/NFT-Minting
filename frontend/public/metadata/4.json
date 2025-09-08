@@ -1,0 +1,15 @@
+{
+  "name": "NFT #4",
+  "description": "This is a sample NFT metadata stored on IPFS",
+  "image": "https://ipfs.io/ipfs/QmVcio2y1UP7XdvaBhJkKWQT1bCKXXVeeyTVj1KMB9Mz5W/4.jpg",
+  "attributes": [
+    {
+      "trait_type": "Generation",
+      "value": "1"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    }
+  ]
+}

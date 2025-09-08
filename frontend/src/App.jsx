@@ -38,6 +38,18 @@ function App() {
     }
   }
 
+  async function fetchJsonWithFallback(urls) {
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.ok) return await res.json();
+      } catch (_) {
+        // try next
+      }
+    }
+    throw new Error("All metadata sources failed");
+  }
+
   async function ensureSepolia() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const network = await provider.getNetwork();
@@ -169,10 +181,10 @@ function App() {
         Array.from({ length: 16 }, async (_, idx) => {
           const tokenId = idx + 1;
           try {
-            const metaUrl = `${baseURI}${tokenId}.json`;
-            const res = await fetch(metaUrl, { cache: "no-store" });
-            if (!res.ok) throw new Error("metadata not found");
-            const meta = await res.json();
+            const meta = await fetchJsonWithFallback([
+              `/metadata/${tokenId}.json`,
+              `${baseURI}${tokenId}.json`,
+            ]);
             const primary = toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
             const candidates = withGatewayFallback(primary);
             return { name: meta.name || `NFT #${tokenId}` , imageCandidates: candidates };
