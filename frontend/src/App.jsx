@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import NFTContract from "./abi/MyNFT.json";
-import { CONTRACT_ADDRESS, SEPOLIA_CHAIN_ID_DEC, SEPOLIA_CHAIN_ID_HEX, SEPOLIA_PARAMS } from "./contractConfig";
+import {
+  CONTRACT_ADDRESS,
+  SEPOLIA_CHAIN_ID_DEC,
+  SEPOLIA_CHAIN_ID_HEX,
+  SEPOLIA_PARAMS,
+} from "./contractConfig";
 import "./index.css";
 
 function App() {
@@ -10,9 +15,13 @@ function App() {
   const [nfts, setNfts] = useState([]);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  const contractAddress = CONTRACT_ADDRESS; 
+  const contractAddress = CONTRACT_ADDRESS;
   const baseURI =
     "https://ipfs.io/ipfs/QmVcio2y1UP7XdvaBhJkKWQT1bCKXXVeeyTVj1KMB9Mz5W/";
+
+  const readOnlyProvider = new ethers.JsonRpcProvider(
+    import.meta.env.VITE_SEPOLIA_RPC_URL
+  );
 
   function toGatewayURL(ipfsUrl) {
     if (!ipfsUrl) return null;
@@ -44,7 +53,6 @@ function App() {
         const res = await fetch(url, { cache: "no-store" });
         if (res.ok) return await res.json();
       } catch (_) {
-        // try next
       }
     }
     throw new Error("All metadata sources failed");
@@ -80,7 +88,17 @@ function App() {
     }
   }
 
-  // Connect wallet - FIXED VERSION
+  //Create read-only contract on mount
+  useEffect(() => {
+    const readOnlyContract = new ethers.Contract(
+      contractAddress,
+      NFTContract.abi,
+      readOnlyProvider
+    );
+    setContract(readOnlyContract);
+  }, []);
+
+  // Connect wallet (signer contract)
   async function connectWallet() {
     if (!window.ethereum) {
       alert("Install MetaMask!");
@@ -89,7 +107,6 @@ function App() {
 
     setIsConnecting(true);
     try {
-    
       await window.ethereum.request({
         method: "wallet_requestPermissions",
         params: [{ eth_accounts: {} }],
@@ -126,44 +143,43 @@ function App() {
   // Disconnect wallet
   function disconnectWallet() {
     setAccount(null);
-    setContract(null);
+    // revert back to read-only contract
+    const readOnlyContract = new ethers.Contract(
+      contractAddress,
+      NFTContract.abi,
+      readOnlyProvider
+    );
+    setContract(readOnlyContract);
     console.log("Wallet disconnected");
   }
 
-  // Listen for account changes
+  // Listen for account/chain changes
   useEffect(() => {
     if (window.ethereum) {
       const handleAccountsChanged = (accounts) => {
         if (accounts.length === 0) {
-          // User disconnected from MetaMask
           disconnectWallet();
         } else if (account && accounts[0] !== account) {
-          // User switched accounts - update the app
           setAccount(accounts[0]);
-          // Recreate contract with new signer
-          if (contract) {
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            provider.getSigner().then((signer) => {
-              const nftContract = new ethers.Contract(
-                CONTRACT_ADDRESS,
-                NFTContract.abi,
-                signer
-              );
-              setContract(nftContract);
-            });
-          }
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          provider.getSigner().then((signer) => {
+            const nftContract = new ethers.Contract(
+              CONTRACT_ADDRESS,
+              NFTContract.abi,
+              signer
+            );
+            setContract(nftContract);
+          });
         }
       };
 
-      const handleChainChanged = (chainId) => {
-        // Reload on chain change (recommended by MetaMask)
+      const handleChainChanged = () => {
         window.location.reload();
       };
 
       window.ethereum.on("accountsChanged", handleAccountsChanged);
       window.ethereum.on("chainChanged", handleChainChanged);
 
-      // Cleanup
       return () => {
         window.ethereum.removeListener(
           "accountsChanged",
@@ -172,9 +188,9 @@ function App() {
         window.ethereum.removeListener("chainChanged", handleChainChanged);
       };
     }
-  }, [account, contract]);
+  }, [account]);
 
-  // Load NFTs (read metadata -> image with gateway fallback)
+  // Load NFTs metadata
   useEffect(() => {
     const loadNFTs = async () => {
       const items = await Promise.all(
@@ -185,12 +201,16 @@ function App() {
               `/metadata/${tokenId}.json`,
               `${baseURI}${tokenId}.json`,
             ]);
-            const primary = toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
+            const primary =
+              toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
             const candidates = withGatewayFallback(primary);
-            return { name: meta.name || `NFT #${tokenId}` , imageCandidates: candidates };
+            return {
+              name: meta.name || `NFT #${tokenId}`,
+              imageCandidates: candidates,
+            };
           } catch (e) {
             const fallback = `${baseURI}${tokenId}.jpg`;
-            return { name: `NFT #${tokenId}` , imageCandidates: [fallback] };
+            return { name: `NFT #${tokenId}`, imageCandidates: [fallback] };
           }
         })
       );
@@ -201,7 +221,7 @@ function App() {
 
   // Mint NFT
   async function mintNFT() {
-    if (!contract) return alert("Connect wallet first!");
+    if (!account) return alert("Connect wallet first!");
     try {
       const ok = await ensureSepolia();
       if (!ok) return;
