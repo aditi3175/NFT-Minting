@@ -1,0 +1,39 @@
+# Frontend build/cache
+/frontend/node_modules
+/frontend/dist
+/frontend/.vite
+/frontend/.cache
+
+# Root dependencies
+/node_modules
+
+# Hardhat build artifacts and cache
+/artifacts
+/cache
+/coverage
+
+# Generated types (your project uses typechain-types)
+#/types
+/typechain-types
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Hosting/platform (optional)
+.vercel
+.netlify
+
+# Env files (keep secrets out of git)
+.env.local
+.env.*.local
+/frontend/.env
+/.env
