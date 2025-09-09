@@ -69,6 +69,10 @@ Open the shown localhost URL (served over HTTPS on Vercel when deployed).
 
 No frontend env vars are required unless you add private gateway keys.
 
+
+##Deployed site of my dApp
+https://nft-minting-tau.vercel.app/
+
 ---
 
 ## IPFS
