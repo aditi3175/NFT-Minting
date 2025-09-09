@@ -2,14 +2,11 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// __dirname banane ka ESM tareeka
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Kitne NFT ke liye metadata banana hai
 const totalNFTs = 16;
 
-// Metadata folder banado agar nahi hai toh
 const metadataDir = path.join(__dirname, "metadata");
 if (!fs.existsSync(metadataDir)) {
   fs.mkdirSync(metadataDir);
