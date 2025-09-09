@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import NFTContract from "./abi/MyNFT.json";
+
 import {
   CONTRACT_ADDRESS,
   SEPOLIA_CHAIN_ID_DEC,
@@ -22,6 +23,7 @@ function App() {
   const readOnlyProvider = new ethers.JsonRpcProvider(
     import.meta.env.VITE_SEPOLIA_RPC_URL
   );
+
 
   function toGatewayURL(ipfsUrl) {
     if (!ipfsUrl) return null;
@@ -197,12 +199,17 @@ function App() {
         Array.from({ length: 16 }, async (_, idx) => {
           const tokenId = idx + 1;
           try {
-            const meta = await fetchJsonWithFallback([
-              `/metadata/${tokenId}.json`,
-              `${baseURI}${tokenId}.json`,
-            ]);
-            const primary =
-              toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
+            // const meta = await fetchJsonWithFallback([
+            //   `/metadata/${tokenId}.json`,
+            //   `${baseURI}${tokenId}.json`,
+            // ]);
+            const tokenURI = await contract.tokenURI(tokenId);
+            const gatewayUrl = toGatewayURL(tokenURI);
+            const meta = await fetchJsonWithFallback([gatewayUrl]);
+            // const primary =
+            //   toGatewayURL(meta.image) || `${baseURI}${tokenId}.jpg`;
+            // const candidates = withGatewayFallback(primary);
+            const primary = toGatewayURL(meta.image);
             const candidates = withGatewayFallback(primary);
             return {
               name: meta.name || `NFT #${tokenId}`,
